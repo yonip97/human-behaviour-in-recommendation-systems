@@ -65,10 +65,18 @@ class RankSVM(svm.LinearSVC):
 
 
 class DocsRankSVM(RankSVM):
-    def __init__(self, docs, bm25):
+    def __init__(self, docs,queries,rel):
         super(DocsRankSVM, self).__init__()
-        self.bm25 = bm25
+        self.bm25 = self.create_bm25(docs)
         self.docs = docs
+        self.queries = queries
+        self.rel = rel
+
+    def create_bm25(self, docs):
+        tokenized_corpus = [(index, x) for index, x in docs.items()]
+        tokenized_corpus = sorted(tokenized_corpus)
+        tokenized_corpus = [x[1].split(" ") for x in tokenized_corpus]
+        return BM25Okapi(tokenized_corpus)
 
     def extract_features(self, query, doc, doc_id, bm25_score):
         features = [0, 0, 0, 0, 0, 0, 0]
@@ -102,7 +110,7 @@ class DocsRankSVM(RankSVM):
                                                                               doc_id, bm25_scores[doc_id])
         return query_docs_features
 
-    def train(self, queries, rel=None):
+    def train(self):
         all_corpus = [x for x in self.docs.values()]
         word_counts_in_corpus = {}
         for doc in self.bm25.doc_freqs:
@@ -112,8 +120,8 @@ class DocsRankSVM(RankSVM):
                 word_counts_in_corpus[word] += count
         self.word_counts_in_corpus = word_counts_in_corpus
         self.amount_of_words_in_corpus = sum([len(x) for x in all_corpus])
-        query_docs_features = self.create_features(queries)
-        features, target = self.prepare_for_svm(query_docs_features, queries, rel)
+        query_docs_features = self.create_features(self.queries)
+        features, target = self.prepare_for_svm(query_docs_features, self.queries, self.rel)
         super(DocsRankSVM, self).fit(features, target)
 
     def prepare_for_svm(self, query_docs_features, queries, rel=None):
@@ -138,6 +146,10 @@ class DocsRankSVM(RankSVM):
         features = self.prepare_for_svm(query_docs_features, query)
         return super(DocsRankSVM, self).predict(features).reshape((1, -1))
 
+    def update_docs(self, changed_docs):
+        self.docs = changed_docs
+        self.bm25 = self.create_bm25(changed_docs)
+
 
 class Cosiniesimilaritymodel():
     def __init__(self, docs):
@@ -151,10 +163,24 @@ class Cosiniesimilaritymodel():
         similarity = cosine_similarity(query_vector, self.tfidf_vectors)
         return similarity
 
+    def update_docs(self, changed_docs):
+        all_corpus = sorted([(k, x) for k, x in changed_docs.items()])
+        all_corpus = [x[1] for x in all_corpus]
+        self.tfidf_vectors = self.vectorizer.fit_transform(all_corpus).toarray()
+
 
 class BM25():
-    def __init__(self, all_corpus):
-        self.bm_25 = BM25Okapi(all_corpus)
+    def __init__(self, docs):
+        tokenized_corpus = [(index, x) for index, x in docs.items()]
+        tokenized_corpus = sorted(tokenized_corpus)
+        tokenized_corpus = [x[1].split(" ") for x in tokenized_corpus]
+        self.bm_25 = BM25Okapi(tokenized_corpus)
 
     def predict(self, query):
         return self.bm_25.get_scores(query).reshape((1, -1))
+
+    def update_docs(self, changed_docs):
+        tokenized_corpus = [(index, x) for index, x in changed_docs.items()]
+        tokenized_corpus = sorted(tokenized_corpus)
+        tokenized_corpus = [x[1].split(" ") for x in tokenized_corpus]
+        self.bm_25 = BM25Okapi(tokenized_corpus)

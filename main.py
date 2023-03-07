@@ -1,94 +1,10 @@
-import string
 import time
-import optuna
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-import nltk
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import KFold
 import numpy as np
-from models import RankSVM, DocsRankSVM, Cosiniesimilaritymodel
+from models import  DocsRankSVM, Cosiniesimilaritymodel
 from rank_bm25 import BM25Okapi
-from tqdm import tqdm
 from sklearn.metrics import ndcg_score
 
-
-def create_documents_queries_and_relevence():
-    doc_set = {}
-    doc_id = ""
-    doc_text = ""
-    with open('data/CISI.ALL') as f:
-        lines = ""
-        for l in f.readlines():
-            lines += "\n" + l.strip() if l.startswith(".") else " " + l.strip()
-        lines = lines.lstrip("\n").split("\n")
-    doc_count = 0
-    for l in lines:
-        if l.startswith(".I"):
-            doc_id = int(l.split(" ")[1].strip()) - 1
-        elif l.startswith(".X"):
-            doc_set[doc_id] = doc_text.lstrip(" ")
-            doc_id = ""
-            doc_text = ""
-        else:
-            doc_text += l.strip()[3:] + " "  # The first 3 characters of a line can be ignored.
-
-    ### Processing QUERIES
-    with open('data/CISI.QRY') as f:
-        lines = ""
-        for l in f.readlines():
-            lines += "\n" + l.strip() if l.startswith(".") else " " + l.strip()
-        lines = lines.lstrip("\n").split("\n")
-
-    qry_set = {}
-    qry_id = ""
-    for l in lines:
-        if l.startswith(".I"):
-            qry_id = int(l.split(" ")[1].strip()) - 1
-        elif l.startswith(".W"):
-            qry_set[qry_id] = l.strip()[3:]
-            qry_id = ""
-
-    ### Processing QRELS
-    rel_set = {}
-    with open('data/CISI.REL') as f:
-        for l in f.readlines():
-            qry_id = int(l.lstrip(" ").strip("\n").split("\t")[0].split(" ")[0]) - 1
-            doc_id = int(l.lstrip(" ").strip("\n").split("\t")[0].split(" ")[-1]) - 1
-            if qry_id in rel_set:
-                rel_set[qry_id].append(doc_id)
-            else:
-                rel_set[qry_id] = []
-                rel_set[qry_id].append(doc_id)
-    return doc_set, qry_set, rel_set
-
-
-def preprocess_string(txt, stemmer, stop_words, tokenizer, detokenizer):
-    txt = txt.lower()
-    punc_to_remove = string.punctuation
-    punc_to_remove = punc_to_remove.replace('.', '')
-    punc_to_remove = punc_to_remove.replace(',', '')
-    punc_to_remove = punc_to_remove.replace("'", '')
-    txt = txt.translate(str.maketrans(punc_to_remove, "".join([' ' for i in range(len(punc_to_remove))])))
-    txt = txt.translate(str.maketrans('', '', ",.'"))
-    tokens = tokenizer.tokenize(txt)
-    tokens = [tk for tk in tokens if tk not in stop_words]
-    tokens = [stemmer.stem(tk) for tk in tokens]
-    txt = detokenizer.detokenize(tokens)
-    return txt
-
-
-def preprocess_data(docs, queries):
-    tokenizer = nltk.tokenize.TreebankWordTokenizer()
-    detokenizer = nltk.tokenize.TreebankWordDetokenizer()
-    stemmer = nltk.stem.PorterStemmer()
-    stop_words = nltk.corpus.stopwords.words('english')
-    processed_docs = {}
-    processed_queries = {}
-    for key, doc in docs.items():
-        processed_docs[key] = preprocess_string(doc, stemmer, stop_words, tokenizer, detokenizer)
-    for key, query in queries.items():
-        processed_queries[key] = preprocess_string(query, stemmer, stop_words, tokenizer, detokenizer)
-    return processed_docs, processed_queries
 
 
 def main():
