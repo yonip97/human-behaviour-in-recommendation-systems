@@ -4,7 +4,8 @@ from scipy.special import softmax
 
 
 class Agent():
-    def __init__(self, id, string: str, strategic: bool, number_of_word_to_add: int, strategy: str, k: int = 1,t:int = 100):
+    def __init__(self, id, string: str, strategic: bool, number_of_word_to_add: int, strategy: str, k: int = 1,
+                 t: int = 100):
         self.id = id
         self.string = string
         self.strategic = strategic
@@ -39,11 +40,11 @@ class Agent():
             for word in word_tf:
                 if word not in words_worth.keys():
                     words_worth[word] = 0
-                words_worth[word] += np.log2(word_tf[word]+1) * queries_worth[query_id]
+                words_worth[word] += np.log2(word_tf[word] + 1) * queries_worth[query_id]
         words_worth = [(k, v) for k, v in words_worth.items()]
         words_worth = sorted(words_worth, reverse=True, key=lambda x: x[1])[:self.k]
         top_k_words = np.array([k[0] for k in words_worth])
-        top_k_scores_after_temperature = [k[1]/self.t for k in words_worth]
+        top_k_scores_after_temperature = [k[1] / self.t for k in words_worth]
         top_k_scores_after_temperature = softmax(top_k_scores_after_temperature)
         words = np.random.choice(top_k_words, size=self.number_of_word_to_add, p=top_k_scores_after_temperature)
         self.string += " ".join(words)
@@ -59,7 +60,7 @@ class Agent():
             for word in word_tf:
                 if word not in words_worth.keys():
                     words_worth[word] = 0
-                words_worth[word] += np.log2(word_tf[word]+1) * queries_worth[query_id]
+                words_worth[word] += np.log2(word_tf[word] + 1) * queries_worth[query_id]
         words_worth = [(k, v) for k, v in words_worth.items()]
         words_worth = sorted(words_worth, reverse=True, key=lambda x: x[1])
         chosen_word = None
@@ -72,7 +73,7 @@ class Agent():
 
 class Env():
     def __init__(self, docs: dict, strategic_percentage: float, model_type: str, number_of_word_to_add: int,
-                 train_queries=None, train_relevance_ranking=None, seed=42, agents_params = None):
+                 train_queries=None, train_relevance_ranking=None, seed=42, agents_params=None):
         self.agents = None
         self.docs = docs
         self.strategic_percentage = strategic_percentage
@@ -123,3 +124,14 @@ class Env():
         for query_id, query in queries.items():
             scores[query_id] = self.model.predict(query)
         return scores
+
+    def calculate_strategic_revenue(self, queries:dict, queries_worth:dict):
+        total_score = 0
+        for query_id, query in queries.items():
+            scores = self.model.predict(query)
+            ranking = np.argsort(scores).tolist()[0][::-1]
+            for agent in self.agents.values():
+                if agent.strategic:
+                    agent_rank = ranking.index(agent.id)
+                    total_score += (1 / np.log2(agent_rank + 2)) * queries_worth[query_id]
+        return total_score

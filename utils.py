@@ -136,3 +136,4 @@ def create_queries_worth(queries,seed = 42):
         queries_worth[query] = np.random.randint(0,100,1)[0]
     return queries_worth
 
+
