@@ -126,7 +126,7 @@ class Env():
         return scores
 
     def calculate_strategic_revenue(self, queries:dict, queries_worth:dict):
-        total_score = 0
+        total_score = 1e-8
         for query_id, query in queries.items():
             scores = self.model.predict(query)
             ranking = np.argsort(scores).tolist()[0][::-1]
